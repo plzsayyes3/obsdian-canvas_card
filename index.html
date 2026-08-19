@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>textbox</title>
+<meta name="description" content="Obsidian Vault (Markdown / Canvas) を GitHub 経由で編集するミニマルなテキストエディタ" />
+<meta name="color-scheme" content="light dark" />
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="./style.css" />
+<script type="importmap">
+{
+  "imports": {
+    "@octokit/rest": "https://esm.sh/@octokit/rest@20.1.1?target=es2022",
+    "@codemirror/state": "https://esm.sh/@codemirror/state@6.4.1?target=es2022",
+    "@codemirror/view": "https://esm.sh/@codemirror/view@6.34.1?target=es2022&deps=@codemirror/state@6.4.1",
+    "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.7.1?target=es2022&deps=@codemirror/state@6.4.1,@codemirror/view@6.34.1",
+    "@codemirror/language": "https://esm.sh/@codemirror/language@6.10.3?target=es2022&deps=@codemirror/state@6.4.1,@codemirror/view@6.34.1",
+    "@codemirror/lang-markdown": "https://esm.sh/@codemirror/lang-markdown@6.3.1?target=es2022&deps=@codemirror/state@6.4.1,@codemirror/view@6.34.1,@codemirror/language@6.10.3"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app" aria-live="polite"></div>
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
