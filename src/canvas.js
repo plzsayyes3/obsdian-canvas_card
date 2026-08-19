@@ -1,12 +1,15 @@
-// Renders the `nodes` of an Obsidian .canvas JSON document as a card grid,
-// supports inline editing, add/delete, and drag-to-reorder. Only `type:
-// "text"` nodes are rendered/editable; every other node (file, link, group)
-// and the `edges` array are preserved untouched in the underlying data.
+// Renders an Obsidian .canvas JSON document as a two-pane board: a large
+// text-input pane (write a new card, or edit whichever card is selected)
+// plus a card gallery. Layout stacks input-over-gallery on narrow screens
+// and splits into two columns on wide ones (see the .tb-canvas-* rules in
+// style.css). Only `type: "text"` nodes are rendered/editable; every other
+// node (file, link, group) and the `edges` array are preserved untouched.
 
 const CARD_W = 260;
 const CARD_H = 160;
 const GAP = 40;
 const COLS = 4;
+const COMMIT_DEBOUNCE_MS = 300;
 
 function isTextNode(node) {
   return node && node.type === "text";
@@ -34,16 +37,135 @@ function relayout(nodes) {
 export function createCanvasBoard(container, { data, onChange }) {
   const wrap = document.createElement("div");
   wrap.className = "tb-canvas-wrap";
+
+  // ---- left/top pane: shared text editor (compose new, or edit selected) ----
+
+  const editorPane = document.createElement("div");
+  editorPane.className = "tb-canvas-editor-pane";
+
+  const editorHeader = document.createElement("div");
+  editorHeader.className = "tb-canvas-editor-header";
+  const editorLabel = document.createElement("span");
+  editorLabel.className = "tb-canvas-editor-label";
+  const newBtn = document.createElement("button");
+  newBtn.type = "button";
+  newBtn.className = "tb-canvas-editor-new";
+  newBtn.textContent = "＋ 新規";
+  newBtn.title = "新しいカードを書く";
+  editorHeader.appendChild(editorLabel);
+  editorHeader.appendChild(newBtn);
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "tb-canvas-editor-textarea";
+  textarea.placeholder = "ここに書くと新しいカードになります…";
+  textarea.spellcheck = false;
+
+  editorPane.appendChild(editorHeader);
+  editorPane.appendChild(textarea);
+
+  // ---- right/bottom pane: card gallery ----
+
+  const gridPane = document.createElement("div");
+  gridPane.className = "tb-canvas-grid-pane";
   const grid = document.createElement("div");
   grid.className = "tb-canvas-grid";
-  wrap.appendChild(grid);
+  gridPane.appendChild(grid);
+
+  wrap.appendChild(editorPane);
+  wrap.appendChild(gridPane);
   container.appendChild(wrap);
 
   let dragId = null;
+  let activeId = null; // null = composing a new card
+  let debounceTimer = null;
 
   function emitChange() {
     onChange(data);
   }
+
+  function findNode(id) {
+    return data.nodes.find((n) => n.id === id);
+  }
+
+  /** Commit whatever is currently in the textarea: create a new card if we
+   *  were composing one (and it's non-empty), or update the selected card. */
+  function commitTextarea() {
+    clearTimeout(debounceTimer);
+    const value = textarea.value;
+    if (activeId === null) {
+      if (!value.trim()) return;
+      const node = {
+        id: crypto.randomUUID(),
+        type: "text",
+        text: value,
+        x: 0,
+        y: 0,
+        width: CARD_W,
+        height: CARD_H,
+      };
+      data.nodes.push(node);
+      relayout(data.nodes);
+      activeId = node.id;
+      editorLabel.textContent = "編集中";
+      emitChange();
+      render();
+    } else {
+      const node = findNode(activeId);
+      if (!node) return;
+      if (node.text === value) return;
+      node.text = value;
+      emitChange();
+      const textEl = grid.querySelector(`.tb-card[data-id="${activeId}"] .tb-card-text`);
+      if (textEl) textEl.textContent = value;
+    }
+  }
+
+  function setActive(id) {
+    commitTextarea(); // flush whatever we're leaving behind first
+    activeId = id;
+    if (id === null) {
+      textarea.value = "";
+      editorLabel.textContent = "新規カード";
+    } else {
+      const node = findNode(id);
+      textarea.value = node ? node.text || "" : "";
+      editorLabel.textContent = "編集中";
+    }
+    highlightActive();
+    textarea.focus();
+  }
+
+  /** Like setActive(null), but discards the current textarea content instead
+   *  of committing it — for when the thing it would commit into is already
+   *  gone (e.g. the active card was just deleted). */
+  function resetEditorToNew() {
+    clearTimeout(debounceTimer);
+    activeId = null;
+    textarea.value = "";
+    editorLabel.textContent = "新規カード";
+    highlightActive();
+  }
+
+  function highlightActive() {
+    grid.querySelectorAll(".tb-card").forEach((el) => {
+      el.classList.toggle("tb-selected", el.dataset.id === activeId);
+    });
+  }
+
+  textarea.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(commitTextarea, COMMIT_DEBOUNCE_MS);
+  });
+
+  textarea.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      commitTextarea();
+      setActive(null); // ready for the next card right away
+    }
+  });
+
+  newBtn.addEventListener("click", () => setActive(null));
 
   function render() {
     grid.innerHTML = "";
@@ -52,37 +174,14 @@ export function createCanvasBoard(container, { data, onChange }) {
     if (textNodes.length === 0) {
       const empty = document.createElement("div");
       empty.className = "tb-canvas-empty";
-      empty.textContent = "カードがありません。＋ で追加してください。";
+      empty.textContent = "カードがありません。左のエリアに書いて追加してください。";
       grid.appendChild(empty);
     }
 
     for (const node of textNodes) {
       grid.appendChild(renderCard(node));
     }
-
-    const addBtn = document.createElement("button");
-    addBtn.className = "tb-card-add";
-    addBtn.type = "button";
-    addBtn.textContent = "+";
-    addBtn.title = "新規カードを追加";
-    addBtn.addEventListener("click", () => {
-      data.nodes.push({
-        id: crypto.randomUUID(),
-        type: "text",
-        text: "",
-        x: 0,
-        y: 0,
-        width: CARD_W,
-        height: CARD_H,
-      });
-      relayout(data.nodes);
-      emitChange();
-      render();
-      const cards = grid.querySelectorAll(".tb-card");
-      const last = cards[cards.length - 1];
-      if (last) last.querySelector(".tb-card-text")?.click();
-    });
-    grid.appendChild(addBtn);
+    highlightActive();
   }
 
   function renderCard(node) {
@@ -98,18 +197,21 @@ export function createCanvasBoard(container, { data, onChange }) {
     del.title = "削除";
     del.addEventListener("click", (e) => {
       e.stopPropagation();
+      const wasActive = activeId === node.id;
       data.nodes = data.nodes.filter((n) => n.id !== node.id);
       relayout(data.nodes);
       emitChange();
       render();
+      if (wasActive) resetEditorToNew();
     });
     card.appendChild(del);
 
     const text = document.createElement("div");
     text.className = "tb-card-text";
     text.textContent = node.text || "";
-    text.addEventListener("click", () => startEditing(card, node, text));
     card.appendChild(text);
+
+    card.addEventListener("click", () => setActive(node.id));
 
     // drag to reorder
     card.addEventListener("dragstart", () => {
@@ -142,43 +244,15 @@ export function createCanvasBoard(container, { data, onChange }) {
     return card;
   }
 
-  function startEditing(card, node, textEl) {
-    const textarea = document.createElement("textarea");
-    textarea.className = "tb-card-textarea";
-    textarea.value = node.text || "";
-    card.replaceChild(textarea, textEl);
-    textarea.focus();
-    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-
-    let debounceTimer = null;
-    const commit = () => {
-      node.text = textarea.value;
-      emitChange();
-    };
-
-    textarea.addEventListener("input", () => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(commit, 300);
-    });
-
-    textarea.addEventListener("blur", () => {
-      clearTimeout(debounceTimer);
-      commit();
-      const fresh = document.createElement("div");
-      fresh.className = "tb-card-text";
-      fresh.textContent = node.text || "";
-      fresh.addEventListener("click", () => startEditing(card, node, fresh));
-      if (textarea.parentElement === card) card.replaceChild(fresh, textarea);
-    });
-  }
-
   render();
+  resetEditorToNew();
 
   return {
     getData: () => data,
     setData: (next) => {
       data = next;
       render();
+      resetEditorToNew();
     },
     destroy: () => wrap.remove(),
   };
