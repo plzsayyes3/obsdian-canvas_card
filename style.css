@@ -246,10 +246,6 @@ button, input, textarea {
   padding: 24px 24px 32px;
 }
 
-.tb-canvas-nav-drawer {
-  display: none; /* shown only below the 860px breakpoint, see media query */
-}
-
 @media (min-width: 860px) {
   .tb-canvas-wrap {
     flex-direction: row;
@@ -274,45 +270,6 @@ button, input, textarea {
   }
   .tb-canvas-editor-textarea {
     font-size: 19px;
-  }
-}
-
-/* mobile: no wheel to step through the coverflow, so a small floating
-   prev/next drawer sits at the left edge instead. */
-@media (max-width: 859px) {
-  .tb-canvas-nav-drawer {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    position: absolute;
-    left: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2000; /* above coverflow cards, which use z-indexes up to ~1000 */
-  }
-  .tb-canvas-nav {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1px solid var(--card-border);
-    background: var(--panel-bg);
-    color: var(--fg-dim);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    transition: border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
-  }
-  .tb-canvas-nav:hover:not(:disabled) {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .tb-canvas-nav:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
 }
 

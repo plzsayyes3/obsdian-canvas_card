@@ -123,25 +123,53 @@ export function createCanvasBoard(container, { data, onChange }) {
     { passive: false },
   );
 
-  // Mobile-only prev/next buttons (no wheel on touch devices) — browsing
-  // only, same as the wheel: it does not touch the editor.
-  const navPrev = document.createElement("button");
-  navPrev.type = "button";
-  navPrev.className = "tb-canvas-nav tb-canvas-nav-prev";
-  navPrev.textContent = "‹";
-  navPrev.title = "前のカードを見る（新しい方へ）";
-  navPrev.addEventListener("click", () => stepBrowse(-1));
-  const navNext = document.createElement("button");
-  navNext.type = "button";
-  navNext.className = "tb-canvas-nav tb-canvas-nav-next";
-  navNext.textContent = "›";
-  navNext.title = "次のカードを見る（古い方へ）";
-  navNext.addEventListener("click", () => stepBrowse(1));
-  const navDrawer = document.createElement("div");
-  navDrawer.className = "tb-canvas-nav-drawer";
-  navDrawer.appendChild(navPrev);
-  navDrawer.appendChild(navNext);
-  gridPane.appendChild(navDrawer);
+  // Touch swipe: no wheel on touch devices, so a horizontal drag on the
+  // stage steps browsing the same way the wheel does — one step per swipe,
+  // and it never touches the editor either. A vertical drag is left alone
+  // so the page can still scroll normally.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchDeltaX = 0;
+  let touchIsHorizontal = null; // decided once movement is big enough to tell
+  const SWIPE_THRESHOLD = 40;
+
+  grid.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchDeltaX = 0;
+      touchIsHorizontal = null;
+    },
+    { passive: true },
+  );
+
+  grid.addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.touches.length !== 1) return;
+      const dx = e.touches[0].clientX - touchStartX;
+      const dy = e.touches[0].clientY - touchStartY;
+      if (touchIsHorizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        touchIsHorizontal = Math.abs(dx) > Math.abs(dy);
+      }
+      if (touchIsHorizontal) {
+        e.preventDefault(); // this gesture is ours — don't also scroll the page
+        touchDeltaX = dx;
+      }
+    },
+    { passive: false },
+  );
+
+  grid.addEventListener("touchend", () => {
+    if (touchIsHorizontal) {
+      if (touchDeltaX <= -SWIPE_THRESHOLD) stepBrowse(1); // swiped left -> older
+      else if (touchDeltaX >= SWIPE_THRESHOLD) stepBrowse(-1); // swiped right -> newer
+    }
+    touchIsHorizontal = null;
+    touchDeltaX = 0;
+  });
 
   wrap.appendChild(editorPane);
   wrap.appendChild(gridPane);
@@ -324,8 +352,6 @@ export function createCanvasBoard(container, { data, onChange }) {
     const textNodes = data.nodes.filter(isTextNode);
 
     continueBtn.disabled = textNodes.length === 0;
-    navPrev.disabled = textNodes.length <= 1;
-    navNext.disabled = textNodes.length <= 1;
 
     if (textNodes.length === 0) {
       const empty = document.createElement("div");
