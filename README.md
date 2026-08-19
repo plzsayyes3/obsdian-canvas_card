@@ -1,8 +1,8 @@
 # textbox
 
-倉下忠憲氏の「textbox」のような、ノイズを削ぎ落としたミニマルな書き心地で、
-GitHub 経由で Obsidian Vault の Markdown (`.md`) と Canvas (`.canvas`) を
-直接ブラウザから編集するためのテキストエディタです。
+ノイズを削ぎ落としたミニマルな書き心地で、GitHub 経由で Obsidian Vault の
+Markdown (`.md`) と Canvas (`.canvas`) を直接ブラウザから編集するための
+テキストエディタです。
 
 ビルド不要・サーバー不要。静的な HTML/CSS/JS だけで動作し、GitHub REST API
 (`repos.getContent` / `repos.createOrUpdateFileContents`) に対して直接
