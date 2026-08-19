@@ -1,14 +1,21 @@
 // Renders an Obsidian .canvas JSON document as a two-pane board: a large
 // text-input pane (write a new card, or edit whichever card is selected)
-// plus a card gallery. Layout stacks input-over-gallery on narrow screens
-// and splits into two columns on wide ones (see the .tb-canvas-* rules in
-// style.css). Only `type: "text"` nodes are rendered/editable; every other
-// node (file, link, group) and the `edges` array are preserved untouched.
+// plus a coverflow-style card gallery (iPod-style: the selected card sits
+// flat and centered, the rest fan out to either side in 3D). Layout stacks
+// input-over-gallery on narrow screens and splits into two columns on wide
+// ones (see the .tb-canvas-* rules in style.css). Only `type: "text"` nodes
+// are rendered/editable; every other node (file, link, group) and the
+// `edges` array are preserved untouched.
 
 const CARD_W = 260;
 const CARD_H = 160;
 const GAP = 40;
 const COMMIT_DEBOUNCE_MS = 300;
+
+// Coverflow stage: how far apart cards sit, and how many steps out from the
+// centered card still get drawn (further ones fade to invisible).
+const CF_SPACING = 130;
+const CF_MAX_OFFSET = 6;
 
 function isTextNode(node) {
   return node && node.type === "text";
@@ -71,6 +78,25 @@ export function createCanvasBoard(container, { data, onChange }) {
   grid.className = "tb-canvas-grid";
   gridPane.appendChild(grid);
 
+  // A plain mouse only sends vertical wheel deltas — translate those into
+  // stepping through the coverflow, not just a trackpad's horizontal swipe.
+  let wheelAccum = 0;
+  const WHEEL_STEP = 60;
+  grid.addEventListener(
+    "wheel",
+    (e) => {
+      if (e.deltaY === 0 || e.deltaX !== 0) return;
+      e.preventDefault();
+      wheelAccum += e.deltaY;
+      while (Math.abs(wheelAccum) >= WHEEL_STEP) {
+        const dir = wheelAccum > 0 ? 1 : -1;
+        stepActive(dir);
+        wheelAccum -= dir * WHEEL_STEP;
+      }
+    },
+    { passive: false },
+  );
+
   wrap.appendChild(editorPane);
   wrap.appendChild(gridPane);
   container.appendChild(wrap);
@@ -109,7 +135,6 @@ export function createCanvasBoard(container, { data, onChange }) {
       editorLabel.textContent = "編集中";
       emitChange();
       render();
-      grid.scrollTo({ left: 0, behavior: "smooth" });
     } else {
       const node = findNode(activeId);
       if (!node) return;
@@ -147,11 +172,44 @@ export function createCanvasBoard(container, { data, onChange }) {
     highlightActive();
   }
 
+  /** Index, among the rendered text-node cards, that should sit centered
+   *  (flat, in front) in the coverflow. Defaults to the newest card (index
+   *  0) while composing a new one, so the stage never sits un-centered. */
+  function centerIndexOf() {
+    if (activeId === null) return 0;
+    const idx = data.nodes.filter(isTextNode).findIndex((n) => n.id === activeId);
+    return idx === -1 ? 0 : idx;
+  }
+
+  function stepActive(dir) {
+    const textNodes = data.nodes.filter(isTextNode);
+    if (textNodes.length === 0) return;
+    const next = Math.max(0, Math.min(textNodes.length - 1, centerIndexOf() + dir));
+    setActive(textNodes[next].id);
+  }
+
+  /** Toggle the selection ring and re-run the coverflow transform for every
+   *  card, positioned relative to centerIndexOf(). */
   function highlightActive() {
-    grid.querySelectorAll(".tb-card").forEach((el) => {
-      const selected = el.dataset.id === activeId;
-      el.classList.toggle("tb-selected", selected);
-      if (selected) el.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    const center = centerIndexOf();
+    grid.querySelectorAll(".tb-card").forEach((el, i) => {
+      el.classList.toggle("tb-selected", el.dataset.id === activeId);
+
+      const offset = i - center;
+      const abs = Math.abs(offset);
+      const visible = abs <= CF_MAX_OFFSET;
+      const sign = Math.sign(offset);
+      const translateX = offset * CF_SPACING;
+      const rotateY = offset === 0 ? 0 : sign * 50;
+      const translateZ = offset === 0 ? 30 : -Math.min(abs, 4) * 36;
+      const scale = offset === 0 ? 1 : Math.max(0.7, 1 - abs * 0.09);
+      const opacity = visible ? Math.max(0.3, 1 - abs * 0.16) : 0;
+      el.style.transform =
+        `translate(-50%, -50%) translateX(${translateX}px) translateZ(${translateZ}px) ` +
+        `rotateY(${rotateY}deg) scale(${scale})`;
+      el.style.opacity = String(opacity);
+      el.style.zIndex = String(1000 - abs);
+      el.style.pointerEvents = visible ? "" : "none";
     });
   }
 

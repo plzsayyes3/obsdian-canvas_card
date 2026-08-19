@@ -157,6 +157,7 @@ button, input, textarea {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .tb-canvas-editor-pane {
@@ -247,31 +248,32 @@ button, input, textarea {
   }
 }
 
-/* single horizontal, swipeable/scrollable row — newest card (index 0) first */
+/* coverflow stage — the centered card sits flat, the rest fan out in 3D
+   (positioning/rotation is computed per-card in canvas.js); wheel or click
+   to step through, newest card (index 0) centered by default. */
 .tb-canvas-grid {
-  display: flex;
-  flex-direction: row;
-  gap: 18px;
+  position: relative;
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 14px;
-  scroll-snap-type: x proximity;
-  scrollbar-width: thin;
+  height: 260px;
+  perspective: 1100px;
+  overflow: hidden;
 }
 
 .tb-card {
-  flex: 0 0 230px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 210px;
+  height: 170px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 10px;
-  min-height: 140px;
   padding: 16px 18px;
-  position: relative;
   cursor: pointer;
-  scroll-snap-align: start;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  overflow: hidden;
+  transition: transform 0.35s ease, opacity 0.35s ease, box-shadow 0.15s ease, border-color 0.15s ease;
   display: flex;
+  align-items: center;
 }
 
 .tb-card:hover {
@@ -280,7 +282,9 @@ button, input, textarea {
 }
 
 .tb-card.tb-dragging {
-  opacity: 0.4;
+  /* !important: canvas.js sets an inline opacity per coverflow offset,
+     which would otherwise win over this class. */
+  opacity: 0.4 !important;
 }
 
 .tb-card.tb-drop-target {
