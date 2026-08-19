@@ -116,19 +116,43 @@ export function createCanvasBoard(container, { data, onChange }) {
       wheelAccum += e.deltaY;
       while (Math.abs(wheelAccum) >= WHEEL_STEP) {
         const dir = wheelAccum > 0 ? 1 : -1;
-        stepActive(dir);
+        stepBrowse(dir);
         wheelAccum -= dir * WHEEL_STEP;
       }
     },
     { passive: false },
   );
 
+  // Mobile-only prev/next buttons (no wheel on touch devices) — browsing
+  // only, same as the wheel: it does not touch the editor.
+  const navPrev = document.createElement("button");
+  navPrev.type = "button";
+  navPrev.className = "tb-canvas-nav tb-canvas-nav-prev";
+  navPrev.textContent = "‹";
+  navPrev.title = "前のカードを見る（新しい方へ）";
+  navPrev.addEventListener("click", () => stepBrowse(-1));
+  const navNext = document.createElement("button");
+  navNext.type = "button";
+  navNext.className = "tb-canvas-nav tb-canvas-nav-next";
+  navNext.textContent = "›";
+  navNext.title = "次のカードを見る（古い方へ）";
+  navNext.addEventListener("click", () => stepBrowse(1));
+  const navDrawer = document.createElement("div");
+  navDrawer.className = "tb-canvas-nav-drawer";
+  navDrawer.appendChild(navPrev);
+  navDrawer.appendChild(navNext);
+  gridPane.appendChild(navDrawer);
+
   wrap.appendChild(editorPane);
   wrap.appendChild(gridPane);
   container.appendChild(wrap);
 
   let dragId = null;
-  let activeId = null; // null = composing a new card
+  let activeId = null; // editor selection: null = composing a new card
+  // Which card sits centered/in-front in the coverflow, tracked by id so it
+  // stays put (and unrelated to the editor) while browsing with the wheel
+  // or the mobile nav buttons. null = "follow the newest card".
+  let centerId = null;
   // Card id the next new card should link from (new -> old arrow), or null
   // for an independent card. Set by the "続きを書く" button; after a
   // chained card is created this advances to that new card's id, so
@@ -215,6 +239,7 @@ export function createCanvasBoard(container, { data, onChange }) {
   function resetEditorToNew() {
     clearTimeout(debounceTimer);
     activeId = null;
+    centerId = null;
     pendingParentId = null;
     textarea.value = "";
     editorLabel.textContent = "新規カード";
@@ -222,19 +247,24 @@ export function createCanvasBoard(container, { data, onChange }) {
   }
 
   /** Index, among the rendered text-node cards, that should sit centered
-   *  (flat, in front) in the coverflow. Defaults to the newest card (index
-   *  0) while composing a new one, so the stage never sits un-centered. */
+   *  (flat, in front) in the coverflow. Follows centerId by identity, so a
+   *  newly-created card (always unshifted to index 0) appears to the left
+   *  of whatever is centered rather than stealing focus. Falls back to the
+   *  newest card (index 0) until the user has ever clicked or browsed. */
   function centerIndexOf() {
-    if (activeId === null) return 0;
-    const idx = data.nodes.filter(isTextNode).findIndex((n) => n.id === activeId);
+    if (centerId === null) return 0;
+    const idx = data.nodes.filter(isTextNode).findIndex((n) => n.id === centerId);
     return idx === -1 ? 0 : idx;
   }
 
-  function stepActive(dir) {
+  /** Move the coverflow's visual focus only — does NOT touch the editor.
+   *  Used by the wheel and the mobile nav buttons ("just looking"). */
+  function stepBrowse(dir) {
     const textNodes = data.nodes.filter(isTextNode);
     if (textNodes.length === 0) return;
     const next = Math.max(0, Math.min(textNodes.length - 1, centerIndexOf() + dir));
-    setActive(textNodes[next].id);
+    centerId = textNodes[next].id;
+    highlightActive();
   }
 
   /** Toggle the selection ring and re-run the coverflow transform for every
@@ -294,6 +324,8 @@ export function createCanvasBoard(container, { data, onChange }) {
     const textNodes = data.nodes.filter(isTextNode);
 
     continueBtn.disabled = textNodes.length === 0;
+    navPrev.disabled = textNodes.length <= 1;
+    navNext.disabled = textNodes.length <= 1;
 
     if (textNodes.length === 0) {
       const empty = document.createElement("div");
@@ -329,10 +361,11 @@ export function createCanvasBoard(container, { data, onChange }) {
       if (Array.isArray(data.edges)) {
         data.edges = data.edges.filter((edge) => edge.fromNode !== node.id && edge.toNode !== node.id);
       }
+      if (centerId === node.id) centerId = null;
       relayout(data.nodes);
       emitChange();
+      if (wasActive) resetEditorToNew(); // clears activeId/pendingParentId/textarea (centerId already cleared above)
       render();
-      if (wasActive) resetEditorToNew();
     });
     card.appendChild(del);
 
@@ -349,7 +382,10 @@ export function createCanvasBoard(container, { data, onChange }) {
     text.textContent = node.text || "";
     card.appendChild(text);
 
-    card.addEventListener("click", () => setActive(node.id));
+    card.addEventListener("click", () => {
+      centerId = node.id;
+      setActive(node.id);
+    });
 
     // drag to reorder
     card.addEventListener("dragstart", () => {
