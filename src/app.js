@@ -28,9 +28,22 @@ statusDot.className = "tb-status-dot";
 statusDot.dataset.status = "idle";
 document.body.appendChild(statusDot);
 
+// Real tappable buttons, not just a keyboard-shortcut hint — a touchscreen
+// has no ⌘K, so this is the only way in on mobile.
 const hint = document.createElement("div");
 hint.className = "tb-hint";
-hint.textContent = "⌘K 開く/新規  ⌘, 設定";
+const hintOpenBtn = document.createElement("button");
+hintOpenBtn.type = "button";
+hintOpenBtn.className = "tb-hint-btn";
+hintOpenBtn.textContent = "⌘K 開く/新規";
+hintOpenBtn.addEventListener("click", () => showPalette());
+const hintSettingsBtn = document.createElement("button");
+hintSettingsBtn.type = "button";
+hintSettingsBtn.className = "tb-hint-btn";
+hintSettingsBtn.textContent = "⌘, 設定";
+hintSettingsBtn.addEventListener("click", () => showSettings());
+hint.appendChild(hintOpenBtn);
+hint.appendChild(hintSettingsBtn);
 document.body.appendChild(hint);
 
 subscribe((s) => {
@@ -80,10 +93,24 @@ function renderWelcome() {
   clearStage();
   const el = document.createElement("div");
   el.className = "tb-welcome";
-  el.innerHTML = `
-    <div class="tb-mark">textbox</div>
-    <div>&#8984;K &#12414;&#12383;&#12399; Ctrl+K &#12391;&#12501;&#12449;&#12452;&#12523;&#12434;&#38283;&#12367;&#12363;&#12289;&#26032;&#35215;&#20316;&#25104;</div>
-  `;
+
+  const mark = document.createElement("div");
+  mark.className = "tb-mark";
+  mark.textContent = "textbox";
+
+  const openBtn = document.createElement("button");
+  openBtn.type = "button";
+  openBtn.className = "tb-welcome-open";
+  openBtn.textContent = "ファイルを開く / 新規作成";
+  openBtn.addEventListener("click", () => showPalette());
+
+  const kbdHint = document.createElement("div");
+  kbdHint.className = "tb-welcome-kbd-hint";
+  kbdHint.textContent = "⌘K / Ctrl+K でも開けます";
+
+  el.appendChild(mark);
+  el.appendChild(openBtn);
+  el.appendChild(kbdHint);
   app.appendChild(el);
   pathLabel.classList.remove("tb-visible");
 }

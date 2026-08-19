@@ -83,13 +83,25 @@ button, input, textarea {
   letter-spacing: 0.02em;
 }
 
-.tb-welcome kbd {
-  font-family: var(--font-mono);
-  font-size: 0.85em;
+.tb-welcome-open {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--fg);
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 4px;
-  padding: 0.15em 0.5em;
+  border-radius: 8px;
+  padding: 10px 22px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.tb-welcome-open:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tb-welcome-kbd-hint {
+  font-size: 0.8em;
+  color: var(--fg-faint);
 }
 
 /* ---------- markdown editor ---------- */
@@ -447,13 +459,27 @@ button, input, textarea {
 
 .tb-hint {
   position: fixed;
-  bottom: 20px;
-  left: 24px;
+  bottom: 14px;
+  left: 16px;
+  display: flex;
+  gap: 4px;
+  z-index: 4000; /* stays above coverflow cards (up to z-index 1000) and the mobile nav drawer (2000) */
+}
+
+.tb-hint-btn {
   font-family: var(--font-ui);
   font-size: 11px;
   color: var(--fg-faint);
-  z-index: 5;
-  user-select: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 8px 10px; /* generous tap target even though the text stays small */
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.tb-hint-btn:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* ---------- command palette ---------- */
