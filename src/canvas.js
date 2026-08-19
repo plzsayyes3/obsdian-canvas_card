@@ -7,18 +7,35 @@
 // are rendered/editable; every other node (file, link, group) and the
 // `edges` array are preserved untouched.
 
-const CARD_W = 260;
+const CARD_W = 390;
 const CARD_H = 160;
 const GAP = 40;
 const COMMIT_DEBOUNCE_MS = 300;
 
 // Coverflow stage: how far apart cards sit, and how many steps out from the
 // centered card still get drawn (further ones fade to invisible).
-const CF_SPACING = 130;
+const CF_SPACING = 195;
 const CF_MAX_OFFSET = 6;
+
+// Card text shrinks to fit rather than getting clipped.
+const TEXT_BASE_SIZE = 14.5;
+const TEXT_MIN_SIZE = 9;
 
 function isTextNode(node) {
   return node && node.type === "text";
+}
+
+/** Shrink textEl's font size (down to TEXT_MIN_SIZE) until its content fits
+ *  within card's available height, instead of letting it get cut off. */
+function fitCardText(card, textEl) {
+  const cardStyle = getComputedStyle(card);
+  const available = card.clientHeight - parseFloat(cardStyle.paddingTop) - parseFloat(cardStyle.paddingBottom);
+  let size = TEXT_BASE_SIZE;
+  textEl.style.fontSize = `${size}px`;
+  while (textEl.scrollHeight > available && size > TEXT_MIN_SIZE) {
+    size -= 0.5;
+    textEl.style.fontSize = `${size}px`;
+  }
 }
 
 /** Lay text nodes out left-to-right in a single row, in their current array
@@ -54,13 +71,22 @@ export function createCanvasBoard(container, { data, onChange }) {
   editorHeader.className = "tb-canvas-editor-header";
   const editorLabel = document.createElement("span");
   editorLabel.className = "tb-canvas-editor-label";
+  const editorButtons = document.createElement("div");
+  editorButtons.className = "tb-canvas-editor-buttons";
+  const continueBtn = document.createElement("button");
+  continueBtn.type = "button";
+  continueBtn.className = "tb-canvas-editor-continue";
+  continueBtn.textContent = "↳ 続きを書く";
+  continueBtn.title = "選択中のカード（未選択なら最新のカード）から続けて、新→古の矢印でつながる新規カードを書く";
   const newBtn = document.createElement("button");
   newBtn.type = "button";
   newBtn.className = "tb-canvas-editor-new";
-  newBtn.textContent = "＋ 新規";
-  newBtn.title = "新しいカードを書く";
+  newBtn.textContent = "＋ 新規（独立）";
+  newBtn.title = "どこにもつながらない新しいカードを書く";
+  editorButtons.appendChild(continueBtn);
+  editorButtons.appendChild(newBtn);
   editorHeader.appendChild(editorLabel);
-  editorHeader.appendChild(newBtn);
+  editorHeader.appendChild(editorButtons);
 
   const textarea = document.createElement("textarea");
   textarea.className = "tb-canvas-editor-textarea";
@@ -103,6 +129,11 @@ export function createCanvasBoard(container, { data, onChange }) {
 
   let dragId = null;
   let activeId = null; // null = composing a new card
+  // Card id the next new card should link from (new -> old arrow), or null
+  // for an independent card. Set by the "続きを書く" button; after a
+  // chained card is created this advances to that new card's id, so
+  // repeated Ctrl/Cmd+Enter keeps the thread going without re-clicking.
+  let pendingParentId = null;
   let debounceTimer = null;
 
   function emitChange() {
@@ -130,6 +161,19 @@ export function createCanvasBoard(container, { data, onChange }) {
         height: CARD_H,
       };
       data.nodes.unshift(node); // newest first
+      if (pendingParentId && findNode(pendingParentId)) {
+        if (!Array.isArray(data.edges)) data.edges = [];
+        data.edges.push({
+          id: crypto.randomUUID(),
+          fromNode: node.id,
+          fromSide: "right",
+          toNode: pendingParentId,
+          toSide: "left",
+        });
+        pendingParentId = node.id; // keep the thread going by default
+      } else {
+        pendingParentId = null;
+      }
       relayout(data.nodes);
       activeId = node.id;
       editorLabel.textContent = "編集中";
@@ -142,7 +186,10 @@ export function createCanvasBoard(container, { data, onChange }) {
       node.text = value;
       emitChange();
       const textEl = grid.querySelector(`.tb-card[data-id="${activeId}"] .tb-card-text`);
-      if (textEl) textEl.textContent = value;
+      if (textEl) {
+        textEl.textContent = value;
+        fitCardText(textEl.closest(".tb-card"), textEl);
+      }
     }
   }
 
@@ -151,8 +198,9 @@ export function createCanvasBoard(container, { data, onChange }) {
     activeId = id;
     if (id === null) {
       textarea.value = "";
-      editorLabel.textContent = "新規カード";
+      editorLabel.textContent = pendingParentId ? "続き" : "新規カード";
     } else {
+      pendingParentId = null; // editing an existing card cancels any pending continuation
       const node = findNode(id);
       textarea.value = node ? node.text || "" : "";
       editorLabel.textContent = "編集中";
@@ -167,6 +215,7 @@ export function createCanvasBoard(container, { data, onChange }) {
   function resetEditorToNew() {
     clearTimeout(debounceTimer);
     activeId = null;
+    pendingParentId = null;
     textarea.value = "";
     editorLabel.textContent = "新規カード";
     highlightActive();
@@ -226,11 +275,25 @@ export function createCanvasBoard(container, { data, onChange }) {
     }
   });
 
-  newBtn.addEventListener("click", () => setActive(null));
+  newBtn.addEventListener("click", () => {
+    pendingParentId = null;
+    setActive(null);
+  });
+
+  continueBtn.addEventListener("click", () => {
+    const textNodes = data.nodes.filter(isTextNode);
+    if (textNodes.length === 0) return;
+    const parentId = activeId !== null ? activeId : textNodes[0].id;
+    setActive(null);
+    pendingParentId = parentId;
+    editorLabel.textContent = "続き";
+  });
 
   function render() {
     grid.innerHTML = "";
     const textNodes = data.nodes.filter(isTextNode);
+
+    continueBtn.disabled = textNodes.length === 0;
 
     if (textNodes.length === 0) {
       const empty = document.createElement("div");
@@ -242,6 +305,9 @@ export function createCanvasBoard(container, { data, onChange }) {
     for (const node of textNodes) {
       grid.appendChild(renderCard(node));
     }
+    grid.querySelectorAll(".tb-card").forEach((card) => {
+      fitCardText(card, card.querySelector(".tb-card-text"));
+    });
     highlightActive();
   }
 
@@ -260,12 +326,23 @@ export function createCanvasBoard(container, { data, onChange }) {
       e.stopPropagation();
       const wasActive = activeId === node.id;
       data.nodes = data.nodes.filter((n) => n.id !== node.id);
+      if (Array.isArray(data.edges)) {
+        data.edges = data.edges.filter((edge) => edge.fromNode !== node.id && edge.toNode !== node.id);
+      }
       relayout(data.nodes);
       emitChange();
       render();
       if (wasActive) resetEditorToNew();
     });
     card.appendChild(del);
+
+    if (Array.isArray(data.edges) && data.edges.some((edge) => edge.fromNode === node.id)) {
+      const badge = document.createElement("span");
+      badge.className = "tb-card-link-badge";
+      badge.textContent = "↳";
+      badge.title = "前のカードから続いています";
+      card.appendChild(badge);
+    }
 
     const text = document.createElement("div");
     text.className = "tb-card-text";
