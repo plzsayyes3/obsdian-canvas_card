@@ -213,8 +213,11 @@ button, input, textarea {
 .tb-canvas-editor-textarea::placeholder { color: var(--fg-faint); }
 
 .tb-canvas-grid-pane {
-  flex: 1 1 auto;
-  padding: 24px 24px 100px;
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  padding: 24px 24px 32px;
 }
 
 @media (min-width: 860px) {
@@ -234,23 +237,31 @@ button, input, textarea {
   }
   .tb-canvas-grid-pane {
     flex: 1 1 auto;
+    min-width: 0;
     height: 100%;
-    overflow-y: auto;
-    padding: 56px 36px 120px;
+    align-items: center;
+    padding: 36px;
   }
   .tb-canvas-editor-textarea {
     font-size: 19px;
   }
 }
 
+/* single horizontal, swipeable/scrollable row — newest card (index 0) first */
 .tb-canvas-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 18px;
-  align-items: start;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 14px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
 }
 
 .tb-card {
+  flex: 0 0 230px;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 10px;
@@ -258,6 +269,7 @@ button, input, textarea {
   padding: 16px 18px;
   position: relative;
   cursor: pointer;
+  scroll-snap-align: start;
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
   display: flex;
 }
@@ -327,7 +339,7 @@ button, input, textarea {
   font-family: var(--font-ui);
   text-align: center;
   padding: 4em 1em;
-  grid-column: 1 / -1;
+  width: 100%;
 }
 
 /* ---------- chrome: path label + status dot ---------- */

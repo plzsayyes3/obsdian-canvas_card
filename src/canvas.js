@@ -8,22 +8,22 @@
 const CARD_W = 260;
 const CARD_H = 160;
 const GAP = 40;
-const COLS = 4;
 const COMMIT_DEBOUNCE_MS = 300;
 
 function isTextNode(node) {
   return node && node.type === "text";
 }
 
-/** Recompute x/y for text nodes into a simple grid, in their current array order. */
+/** Lay text nodes out left-to-right in a single row, in their current array
+ *  order, so the same left-to-right order is visible if this .canvas file is
+ *  opened directly in Obsidian. New cards are unshifted to the front of the
+ *  array (see commitTextarea), so index 0 — leftmost — is the newest card. */
 function relayout(nodes) {
   let i = 0;
   for (const node of nodes) {
     if (!isTextNode(node)) continue;
-    const col = i % COLS;
-    const row = Math.floor(i / COLS);
-    node.x = col * (CARD_W + GAP);
-    node.y = row * (CARD_H + GAP);
+    node.x = i * (CARD_W + GAP);
+    node.y = 0;
     node.width = node.width || CARD_W;
     node.height = node.height || CARD_H;
     i++;
@@ -103,12 +103,13 @@ export function createCanvasBoard(container, { data, onChange }) {
         width: CARD_W,
         height: CARD_H,
       };
-      data.nodes.push(node);
+      data.nodes.unshift(node); // newest first
       relayout(data.nodes);
       activeId = node.id;
       editorLabel.textContent = "編集中";
       emitChange();
       render();
+      grid.scrollTo({ left: 0, behavior: "smooth" });
     } else {
       const node = findNode(activeId);
       if (!node) return;
@@ -148,7 +149,9 @@ export function createCanvasBoard(container, { data, onChange }) {
 
   function highlightActive() {
     grid.querySelectorAll(".tb-card").forEach((el) => {
-      el.classList.toggle("tb-selected", el.dataset.id === activeId);
+      const selected = el.dataset.id === activeId;
+      el.classList.toggle("tb-selected", selected);
+      if (selected) el.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
     });
   }
 
