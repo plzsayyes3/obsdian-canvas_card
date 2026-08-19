@@ -47,19 +47,23 @@ function flashPathLabel(text) {
   pathLabelTimer = setTimeout(() => pathLabel.classList.remove("tb-visible"), PATH_LABEL_FADE_MS);
 }
 
-// ---- path helpers ----
+// ---- path filters (include/exclude folder lists from settings) ----
 
-function fullPath(relativePath) {
-  const root = state.settings.root || "";
-  if (!root) return relativePath;
-  return `${root.replace(/\/+$/, "")}/${relativePath.replace(/^\/+/, "")}`;
+// "Notes/, Canvas/" -> ["Notes/", "Canvas/"]
+function parsePathList(raw) {
+  return (raw || "")
+    .split(",")
+    .map((s) => s.trim().replace(/^\/+/, "").replace(/\/+$/, ""))
+    .filter(Boolean)
+    .map((s) => `${s}/`);
 }
 
-function relativizePath(full) {
-  const root = state.settings.root || "";
-  if (!root) return full;
-  const prefix = `${root.replace(/\/+$/, "")}/`;
-  return full.startsWith(prefix) ? full.slice(prefix.length) : full;
+function isPathVisible(path) {
+  const includes = parsePathList(state.settings.includePaths);
+  const excludes = parsePathList(state.settings.excludePaths);
+  if (excludes.some((prefix) => path.startsWith(prefix))) return false;
+  if (includes.length === 0) return true;
+  return includes.some((prefix) => path.startsWith(prefix));
 }
 
 // ---- rendering ----
@@ -119,19 +123,18 @@ function renderCanvas(json) {
 
 // ---- file open / create ----
 
-async function openFile(relativePath) {
-  const path = fullPath(relativePath);
-  const kind = relativePath.endsWith(".canvas") ? "canvas" : "md";
+async function openFile(path) {
+  const kind = path.endsWith(".canvas") ? "canvas" : "md";
   setStatus("idle");
   try {
     const { content, sha } = await fetchFile({ ...state.settings, path });
-    setFile({ path: relativePath, sha, kind });
-    flashPathLabel(relativePath);
+    setFile({ path, sha, kind });
+    flashPathLabel(path);
     if (kind === "canvas") await renderCanvas(content);
     else await renderMarkdown(content);
   } catch (err) {
     if (err instanceof NotFoundError) {
-      await createNewFile(relativePath, kind);
+      await createNewFile(path, kind);
     } else {
       console.error(err);
       alert(`読み込みに失敗しました: ${err.message}`);
@@ -139,9 +142,9 @@ async function openFile(relativePath) {
   }
 }
 
-async function createNewFile(relativePath, kind) {
-  setFile({ path: relativePath, sha: null, kind });
-  flashPathLabel(`${relativePath} (新規)`);
+async function createNewFile(path, kind) {
+  setFile({ path, sha: null, kind });
+  flashPathLabel(`${path} (新規)`);
   if (kind === "canvas") await renderCanvas('{"nodes":[],"edges":[]}');
   else await renderMarkdown("");
   filesCache = null; // list changed
@@ -160,7 +163,7 @@ function scheduleAutosave(delay = AUTOSAVE_DELAY_MS) {
 
 async function doSave() {
   if (!state.file || !currentContentGetter) return;
-  const path = fullPath(state.file.path);
+  const path = state.file.path;
   const content = currentContentGetter();
   setStatus("saving");
   try {
@@ -199,9 +202,7 @@ async function getFilesForPalette() {
   if (filesCache) return filesCache;
   try {
     const all = await listFiles(state.settings);
-    const root = state.settings.root || "";
-    const prefix = root ? `${root.replace(/\/+$/, "")}/` : "";
-    filesCache = all.filter((p) => !prefix || p.startsWith(prefix)).map((p) => relativizePath(p));
+    filesCache = all.filter(isPathVisible);
   } catch (err) {
     console.error(err);
     filesCache = [];

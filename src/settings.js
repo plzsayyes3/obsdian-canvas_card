@@ -31,8 +31,12 @@ export function openSettings({ current, onSave }) {
       <input id="tb-s-branch" type="text" autocomplete="off" placeholder="main" />
     </div>
     <div class="tb-field">
-      <label for="tb-s-root">ルートパス (任意, 例: notes/)</label>
-      <input id="tb-s-root" type="text" autocomplete="off" placeholder="" />
+      <label for="tb-s-include">表示するフォルダ (任意, カンマ区切り, 例: Notes/, Canvas/)</label>
+      <input id="tb-s-include" type="text" autocomplete="off" placeholder="空欄なら全フォルダを表示" />
+    </div>
+    <div class="tb-field">
+      <label for="tb-s-exclude">除外するフォルダ (任意, カンマ区切り, 例: .obsidian/, templates/)</label>
+      <input id="tb-s-exclude" type="text" autocomplete="off" placeholder="" />
     </div>
     <p class="tb-settings-note">
       トークンはこのブラウザの localStorage にのみ保存され、GitHub API 以外へは送信されません。
@@ -52,7 +56,8 @@ export function openSettings({ current, onSave }) {
   $("#tb-s-owner").value = current.owner || "";
   $("#tb-s-repo").value = current.repo || "";
   $("#tb-s-branch").value = current.branch || "main";
-  $("#tb-s-root").value = current.root || "";
+  $("#tb-s-include").value = current.includePaths || "";
+  $("#tb-s-exclude").value = current.excludePaths || "";
 
   $("#tb-s-owner").focus();
 
@@ -67,7 +72,8 @@ export function openSettings({ current, onSave }) {
       owner: $("#tb-s-owner").value.trim(),
       repo: $("#tb-s-repo").value.trim(),
       branch: $("#tb-s-branch").value.trim() || "main",
-      root: $("#tb-s-root").value.trim().replace(/^\/+|\/+$/g, ""),
+      includePaths: $("#tb-s-include").value.trim(),
+      excludePaths: $("#tb-s-exclude").value.trim(),
     });
     close();
   }

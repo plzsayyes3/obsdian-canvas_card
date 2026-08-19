@@ -14,7 +14,12 @@ export const state = {
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const s = raw ? JSON.parse(raw) : {};
+    // Migrate the old single "root" field (removed in favor of
+    // includePaths/excludePaths) into an initial includePaths value.
+    if (s.root && !s.includePaths) s.includePaths = s.root;
+    delete s.root;
+    return s;
   } catch {
     return {};
   }
@@ -25,7 +30,7 @@ export function hasValidSettings(s = state.settings) {
 }
 
 export function saveSettings(partial) {
-  state.settings = { branch: "main", root: "", ...state.settings, ...partial };
+  state.settings = { branch: "main", includePaths: "", excludePaths: "", ...state.settings, ...partial };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   emit();
 }
