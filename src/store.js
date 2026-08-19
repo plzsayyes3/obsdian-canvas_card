@@ -30,7 +30,15 @@ export function hasValidSettings(s = state.settings) {
 }
 
 export function saveSettings(partial) {
-  state.settings = { branch: "main", includePaths: "", excludePaths: "", ...state.settings, ...partial };
+  state.settings = {
+    branch: "main",
+    includePaths: "",
+    excludePaths: "",
+    dailyCanvas: false,
+    dailyCanvasFolder: "",
+    ...state.settings,
+    ...partial,
+  };
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   emit();
 }

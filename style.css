@@ -551,6 +551,23 @@ button, input, textarea {
   border-color: var(--accent);
 }
 
+.tb-field-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fg);
+  cursor: pointer;
+  margin-bottom: 0;
+}
+.tb-field-checkbox input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+  border: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
 .tb-settings-note {
   font-size: 11px;
   color: var(--fg-faint);

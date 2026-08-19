@@ -165,6 +165,9 @@ async function openFile(path) {
     } else {
       console.error(err);
       alert(`読み込みに失敗しました: ${err.message}`);
+      // Never leave the screen blank (e.g. a failed daily-canvas auto-open
+      // on boot, before anything else has ever been rendered).
+      if (!activeEditor) renderWelcome();
     }
   }
 }
@@ -282,12 +285,28 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+// ---- daily canvas ----
+
+function todayCanvasPath() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const folder = (state.settings.dailyCanvasFolder || "").replace(/^\/+|\/+$/g, "");
+  const filename = `${y}-${m}-${d}.canvas`;
+  return folder ? `${folder}/${filename}` : filename;
+}
+
 // ---- boot ----
 
 (async function boot() {
   if (!hasValidSettings()) {
     renderWelcome();
     showSettings();
+    return;
+  }
+  if (state.settings.dailyCanvas) {
+    await openFile(todayCanvasPath());
     return;
   }
   const last = getLastFilePath();

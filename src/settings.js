@@ -38,6 +38,16 @@ export function openSettings({ current, onSave }) {
       <label for="tb-s-exclude">除外するフォルダ (任意, カンマ区切り, 例: .obsidian/, templates/)</label>
       <input id="tb-s-exclude" type="text" autocomplete="off" placeholder="" />
     </div>
+    <div class="tb-field tb-field-checkbox">
+      <label for="tb-s-daily">
+        <input id="tb-s-daily" type="checkbox" />
+        起動時に今日の日付のキャンバスを直接開く
+      </label>
+    </div>
+    <div class="tb-field">
+      <label for="tb-s-daily-folder">日付キャンバスのフォルダ (任意, 例: Daily/)</label>
+      <input id="tb-s-daily-folder" type="text" autocomplete="off" placeholder="空欄ならリポジトリ直下" />
+    </div>
     <p class="tb-settings-note">
       トークンはこのブラウザの localStorage にのみ保存され、GitHub API 以外へは送信されません。
       Fine-grained PAT の場合は対象リポジトリへの Contents 読み書き権限が必要です。
@@ -58,6 +68,8 @@ export function openSettings({ current, onSave }) {
   $("#tb-s-branch").value = current.branch || "main";
   $("#tb-s-include").value = current.includePaths || "";
   $("#tb-s-exclude").value = current.excludePaths || "";
+  $("#tb-s-daily").checked = Boolean(current.dailyCanvas);
+  $("#tb-s-daily-folder").value = current.dailyCanvasFolder || "";
 
   $("#tb-s-owner").focus();
 
@@ -74,6 +86,8 @@ export function openSettings({ current, onSave }) {
       branch: $("#tb-s-branch").value.trim() || "main",
       includePaths: $("#tb-s-include").value.trim(),
       excludePaths: $("#tb-s-exclude").value.trim(),
+      dailyCanvas: $("#tb-s-daily").checked,
+      dailyCanvasFolder: $("#tb-s-daily-folder").value.trim().replace(/^\/+|\/+$/g, ""),
     });
     close();
   }
